@@ -1,20 +1,20 @@
-#!/usr/bin/env python3
 """
-Smart Shopping Assistant Backend - DigitalOcean + Memori Integration
+Smart Shopping Assistant Backend - Swarms + Memori Integration
 
 A FastAPI backend for an AI-powered shopping assistant that remembers
-customer preferences using DigitalOcean AI agents and Memori.
+customer preferences using Swarms agents and Memori for enhanced intelligence.
 
 Features:
 - RESTful API for chat interactions
-- Customer preference learning
+- Multi-agent shopping assistance (Personal Shopper + Product Expert)
+- Customer preference learning with persistent memory
 - Purchase history tracking
-- Product catalog management
-- Memory-enhanced recommendations
+- Intelligent product recommendations
+- Memory-enhanced personalization
 
 Requirements:
-- pip install memorisdk openai python-dotenv fastapi uvicorn
-- Set agent_endpoint and agent_access_key in environment or .env file
+- pip install memorisdk swarms python-dotenv fastapi uvicorn
+- Set OPENAI_API_KEY in environment or .env file
 
 Usage:
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -24,20 +24,28 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from swarms import Agent
 
-from memori import Memori, create_memory_tool
+from memori import Memori
 
 # Load environment variables
 load_dotenv()
 
+# Check for required API key
+if not os.getenv("OPENAI_API_KEY"):
+    print("❌ Error: OPENAI_API_KEY not found in environment variables")
+    print("Please set your OpenAI API key:")
+    print("export OPENAI_API_KEY='your-api-key-here'")
+    print("or create a .env file with: OPENAI_API_KEY=your-api-key-here")
+    exit(1)
+
 # Constants
-DATABASE_PATH = "sqlite:///smart_shopping_digitalocean.db"
-NAMESPACE = "smart_shopping_digitalocean"
+DATABASE_PATH = "sqlite:///smart_shopping_swarms.db"
+NAMESPACE = "smart_shopping_swarms"
 
 # Mock product database - same as Azure version for consistency
 PRODUCT_CATALOG = {
@@ -162,8 +170,8 @@ PRODUCT_CATALOG = {
 # FastAPI app initialization
 app = FastAPI(
     title="Smart Shopping Assistant API",
-    description="DigitalOcean + Memori powered shopping assistant",
-    version="1.0.0",
+    description="Swarms + Memori powered shopping assistant with multi-agent intelligence",
+    version="2.0.0",
 )
 
 # CORS middleware to allow frontend connections
@@ -209,50 +217,68 @@ class ProductSearchRequest(BaseModel):
     query: Optional[str] = None
 
 
-# Global variables for DigitalOcean client and memory system
-digitalocean_client = None
+# Global variables for Swarms agents and memory system
+shopping_assistant_agent = None
 memory_system = None
-memory_tool = None
 
 
 def initialize_services():
-    """Initialize DigitalOcean client and memory system"""
-    global digitalocean_client, memory_system, memory_tool
+    """Initialize Swarms agents and memory system"""
+    global shopping_assistant_agent, memory_system
 
-    # Check for DigitalOcean credentials
-    agent_endpoint = os.environ["agent_endpoint"]
-    agent_access_key = os.environ["agent_access_key"]
-
-    if not agent_endpoint or not agent_access_key:
-        print("❌ Warning: DigitalOcean AI credentials not found in environment")
-        print("Please set: agent_endpoint and agent_access_key")
-        return False
-
-    # Initialize DigitalOcean client
-    base_url = (
-        agent_endpoint
-        if agent_endpoint.endswith("/api/v1/")
-        else f"{agent_endpoint}/api/v1/"
-    )
-
-    digitalocean_client = openai.OpenAI(
-        base_url=base_url,
-        api_key=agent_access_key,
-    )
+    print("🧠 Initializing Memori memory system...")
 
     # Initialize Memori memory system
     memory_system = Memori(
         database_connect=DATABASE_PATH,
-        conscious_ingest=True,
-        verbose=False,
+        auto_ingest=True,  # Automatically store conversation history
+        conscious_ingest=True,  # Store important customer preferences and issues
+        verbose=False,  # Enable logging for audit purposes
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
         namespace=NAMESPACE,
     )
     memory_system.enable()
 
-    # Create memory tool
-    memory_tool = create_memory_tool(memory_system)
+    print("🤖 Creating Swarms agents...")
 
-    print("✅ Services initialized successfully")
+    # Get available products for context
+    available_products = []
+    for category, products in PRODUCT_CATALOG.items():
+        for product in products:
+            available_products.append(
+                f"- {product['name']} (${product['price']}) - {product['description']}"
+            )
+
+    products_context = "\n".join(available_products)
+
+    # Create Personal Shopping Assistant Agent
+    shopping_assistant_agent = Agent(
+        model_name="gpt-4o",
+        system_prompt=f"""You are a friendly and knowledgeable personal shopping assistant. Your role is to help customers find products that match their needs, preferences, and budget.
+
+Available Products in Our Store:
+{products_context}
+
+Your capabilities:
+- Help customers find specific products
+- Provide personalized recommendations based on customer history
+- Answer questions about products, prices, and features
+- Assist with comparisons between different products
+- Remember customer preferences for future interactions
+
+Guidelines:
+1. Always be friendly, helpful, and conversational
+2. Recommend specific products from our catalog with accurate prices
+3. Ask clarifying questions when needed to better understand customer needs
+4. Be honest about what's available - don't suggest products not in our catalog
+5. Focus on helping customers make informed decisions
+6. Remember customer interactions for personalization
+
+When a customer asks for help, provide tailored recommendations based on their needs.""",
+        max_loops=1,
+    )
+
+    print("✅ Swarms agents and memory system initialized successfully")
     return True
 
 
@@ -289,99 +315,32 @@ def search_products_in_catalog(
     return products
 
 
-def chat_with_digitalocean(user_input: str, customer_id: str = "default") -> str:
-    """Process user input with DigitalOcean AI and memory"""
-    if not digitalocean_client or not memory_system:
+def chat_with_swarms(user_input: str, customer_id: str = "default") -> str:
+    """Process user input with Swarms agents and memory"""
+    if not shopping_assistant_agent or not memory_system:
         return "Service not initialized. Please check configuration."
 
     try:
-        # Search memory for customer context
-        customer_context = ""
-        if len(user_input.strip()) > 5:
-            try:
-                context_result = memory_tool.execute(
-                    query=f"customer:{customer_id} {user_input[:100]}"
-                )
-                if (
-                    context_result
-                    and "No relevant memories found" not in context_result
-                ):
-                    customer_context = f"\n\nCustomer history: {context_result[:500]}"
-            except Exception:
-                pass
+        # Create enhanced input with customer context
+        enhanced_input = f"[Customer ID: {customer_id}] {user_input}"
 
-        # Get available products for context
-        available_products = []
-        for _category, products in PRODUCT_CATALOG.items():
-            for product in products:
-                available_products.append(
-                    f"- {product['name']} (${product['price']}) - {product['description']}"
-                )
+        # Run the agent - Memori will automatically handle memory
+        shopping_assistant_agent.run(enhanced_input)
 
-        products_context = "\n".join(available_products[:10])  # Limit to 10 products
+        # Use Swarms' built-in method to get the latest response from conversation history
+        # This avoids hardcoded parsing and uses the framework's intended approach
+        ai_response = shopping_assistant_agent.short_memory.get_last_message_as_string()
 
-        # Create enhanced prompt
-        system_prompt = f"""You are a friendly AI shopping assistant for an online store. You help customers find products and provide personalized recommendations.
-
-Available Products in Our Store:
-{products_context}
-
-Guidelines:
-1. Be conversational and helpful
-2. Recommend specific products from our catalog with prices
-3. Ask clarifying questions if needed
-4. Use customer history to personalize recommendations
-5. Be direct about what we have available
-6. Don't claim to have products not in our catalog
-7. Focus on helping customers find the best products for their needs
-
-Your goal is to provide helpful shopping assistance and product recommendations."""
-
-        enhanced_input = user_input
-        if customer_context:
-            enhanced_input = f"{user_input}{customer_context}"
-
-        # Get response from DigitalOcean AI
-        response = digitalocean_client.chat.completions.create(
-            model="n/a",  # DigitalOcean uses "n/a" as model parameter
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": enhanced_input},
-            ],
-        )
-
-        ai_response = response.choices[0].message.content
-
-        # Record conversation in memory
-        memory_system.record_conversation(
-            user_input=f"[Customer:{customer_id}] {user_input}",
-            ai_output=ai_response,
-            model="digitalocean",
-            metadata={
-                "platform": "digitalocean",
-                "customer_id": customer_id,
-                "interaction_type": "shopping_assistance",
-                "had_context": bool(customer_context),
-            },
-        )
+        # Fallback if no response is available
+        if not ai_response or ai_response.strip() == "":
+            ai_response = (
+                "I apologize, but I couldn't process your request at the moment."
+            )
 
         return ai_response
 
     except Exception as e:
         error_msg = f"Sorry, I encountered an error: {str(e)}"
-        try:
-            memory_system.record_conversation(
-                user_input=f"[Customer:{customer_id}] {user_input}",
-                ai_output=error_msg,
-                model="digitalocean",
-                metadata={
-                    "platform": "digitalocean",
-                    "customer_id": customer_id,
-                    "error": True,
-                },
-            )
-        except:
-            pass
         return error_msg
 
 
@@ -403,12 +362,10 @@ async def root():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Chat with the shopping assistant"""
-    if not digitalocean_client:
-        raise HTTPException(
-            status_code=500, detail="DigitalOcean service not initialized"
-        )
+    if not shopping_assistant_agent:
+        raise HTTPException(status_code=500, detail="Swarms agents not initialized")
 
-    response = chat_with_digitalocean(request.message, request.customer_id)
+    response = chat_with_swarms(request.message, request.customer_id)
 
     return ChatResponse(response=response, timestamp=datetime.now().isoformat())
 
@@ -454,11 +411,12 @@ async def get_categories():
 @app.get("/memory/search")
 async def search_memory(query: str):
     """Search customer memory (for debugging/admin)"""
-    if not memory_tool:
+    if not memory_system:
         raise HTTPException(status_code=500, detail="Memory service not initialized")
 
     try:
-        result = memory_tool.execute(query=query)
+        # Use Memori's search functionality directly
+        result = memory_system.search(query=query)
         return {"query": query, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Memory search error: {str(e)}")
