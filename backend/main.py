@@ -407,7 +407,8 @@ async def chat(request: ChatRequest):
     """Chat with the shopping assistant"""
     if not digitalocean_client:
         raise HTTPException(
-            status_code=500, detail="DigitalOcean service not initialized"
+            status_code=500,
+            detail=f"DigitalOcean service not initialized {agent_endpoint}",
         )
 
     response = chat_with_digitalocean(request.message, request.customer_id)
