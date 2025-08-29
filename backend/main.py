@@ -177,7 +177,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://preview--smart-shopping-assistant-fastapi.lovable.app",
+        "https://preview--smart-shopping-ai-agent.lovable.app",
+        "https://smart-shopping-ai-agent.lovable.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
