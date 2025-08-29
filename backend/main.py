@@ -130,7 +130,7 @@ PRODUCT_CATALOG = {
             "rating": 4.8,
             "category": "cleaning",
             "description": "Powerful cordless vacuum with laser detect technology",
-            "image": "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=500&h=500&fit=crop",
+            "image": "https://images.unsplash.com/photo-1609205068962-b5b6bb6c5da1?w=500&h=500&fit=crop&crop=center",
         },
         {
             "id": "mattress",
@@ -150,7 +150,7 @@ PRODUCT_CATALOG = {
             "rating": 4.3,
             "category": "technology",
             "description": "Non-technical guide to understanding artificial intelligence",
-            "image": "https://images.unsplash.com/photo-1485988512492-1d364fe2c5ac?w=500&h=500&fit=crop",
+            "image": "https://images.unsplash.com/photo-1516414447565-b14be0adf13e?w=500&h=500&fit=crop&crop=center",
         },
         {
             "id": "cookbook",
