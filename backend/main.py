@@ -178,7 +178,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://preview--smart-shopping-ai-agent.lovable.app",
-        "https://smart-shopping-ai-agent.lovable.app"
+        "https://smart-shopping-ai-agent.lovable.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -341,6 +341,7 @@ Your goal is to provide helpful shopping assistance and product recommendations.
 
         enhanced_input = user_input
         if customer_context:
+            print(f"Found customer context: {customer_context}")
             enhanced_input = f"{user_input}{customer_context}"
 
         # Get response from DigitalOcean AI
@@ -353,6 +354,8 @@ Your goal is to provide helpful shopping assistance and product recommendations.
         )
 
         ai_response = response.choices[0].message.content
+
+        print(f"AI Response: {ai_response}")
 
         # Record conversation in memory
         memory_system.record_conversation(
